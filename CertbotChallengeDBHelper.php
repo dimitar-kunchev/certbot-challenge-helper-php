@@ -7,6 +7,7 @@ use MongoDB\Database;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use function DI\get;
 
 class CertbotChallengeDBHelper {
     private ContainerInterface $container;
@@ -79,9 +80,9 @@ class CertbotChallengeDBHelper {
          * CERTBOT_ALL_DOMAINS
          */
 
-        $domain = $_ENV['CERTBOT_DOMAIN'] ?? null;
-        $validation = $_ENV['CERTBOT_VALIDATION'] ?? null;
-        $token = $_ENV['CERTBOT_TOKEN'] ?? null;
+        $domain = getenv('CERTBOT_DOMAIN');
+        $validation = getenv('CERTBOT_VALIDATION');
+        $token = getenv('CERTBOT_TOKEN');
 
         if ($domain === null || $validation === null || $token === null) {
             throw new \Exception('Missing environment variables');
@@ -102,9 +103,9 @@ class CertbotChallengeDBHelper {
          * CERTBOT_ALL_DOMAINS
          */
 
-        $domain = $_ENV['CERTBOT_DOMAIN'] ?? null;
-        $validation = $_ENV['CERTBOT_VALIDATION'] ?? null;
-        $token = $_ENV['CERTBOT_TOKEN'] ?? null;
+        $domain = getenv('CERTBOT_DOMAIN');
+        $validation = getenv('CERTBOT_VALIDATION');
+        $token = getenv('CERTBOT_TOKEN');
 
         if ($domain === null || $validation === null || $token === null) {
             throw new \Exception('Missing environment variables');
