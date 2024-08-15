@@ -4,10 +4,10 @@ namespace CertbotChallengeDBHelper;
 
 use MongoDB\Collection;
 use MongoDB\Database;
+use MongoDB\BSON\UTCDateTime;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use function DI\get;
 
 class CertbotChallengeDBHelper {
     private ContainerInterface $container;
@@ -25,8 +25,8 @@ class CertbotChallengeDBHelper {
             'domain' => $domain,
             'token' => $token,
             'validation' => $validation,
-            'timestamp' => new MongoDB\BSON\UTCDateTime(),
-            'expires' => new MongoDB\BSON\UTCDateTime(strtotime('+1 hour') * 1000)
+            'timestamp' => new UTCDateTime(),
+            'expires' => new UTCDateTime(strtotime('+1 hour') * 1000)
         ]);
     }
 
@@ -37,11 +37,11 @@ class CertbotChallengeDBHelper {
         ]);
         // remove any expired
         $this->collection->deleteMany([
-            'expires' => ['$lt' => new MongoDB\BSON\UTCDateTime()]
+            'expires' => ['$lt' => new UTCDateTime()]
         ]);
     }
 
-    public function GetValidation(string $token) : ?string {
+    public function GetValidation(string $domain, string $token) : ?string {
         $challenge = $this->collection->findOne(['token' => $token]);
 
         if ($challenge === null) {
@@ -49,7 +49,7 @@ class CertbotChallengeDBHelper {
         }
 
         // check if expired
-        if ($challenge['expires'] < new MongoDB\BSON\UTCDateTime()) {
+        if ($challenge['expires'] < new UTCDateTime()) {
             $this->RemoveChallenge($challenge['domain'], $challenge['token']);
             return null;
         }
@@ -58,12 +58,31 @@ class CertbotChallengeDBHelper {
     }
 
     public function HandleTokenRequest(ServerRequestInterface $request, ResponseInterface $response, array $args) : ResponseInterface {
+        $logger = $this->container->has('logger') ? $this->container->get('logger') : null;
+        if ($logger !== null) {
+            $logger->debug('HandleTokenRequest ', ['args' => $args, 'method' => $request->getMethod(), 'uri' => $request->getUri()]);
+        }
+        return $response->withStatus(405);
         if ($request->getMethod() !== 'GET') {
             return $response->withStatus(405);
         }
         $token = $args['token'];
-        $validation = $this->GetValidation($token);
+        $domain = $request->getUri()->getHost();
+        $validation = $this->GetValidation($domain, $token);
         if ($validation === null) {
+            if ($logger !== null) {
+                $logger->debug('Token not found');
+            }
+            return $response->withStatus(404);
+        }
+        if ($logger !== null) {
+            $logger->debug('Token found!');
+        }
+        if ($validation->getExpires() < new UTCDateTime()) {
+            if ($logger !== null) {
+                $logger->debug('Token expired');
+            }
+            $this->RemoveChallenge($domain, $token);
             return $response->withStatus(404);
         }
         $response->getBody()->write($validation);
