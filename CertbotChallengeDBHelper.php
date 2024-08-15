@@ -20,10 +20,17 @@ class CertbotChallengeDBHelper {
         $this->collection = $db->selectCollection('certbotChallenges');
     }
 
+    private function log(string $message, array $params = []) : void {
+        if ($this->container->has('logger')) {
+            $this->container->get('logger')->debug('CertbotChallengeDBHelper -> '.$message, $params);
+        }
+    }
+
     public function AddChallenge(string $domain, string $token, $validation) : void {
+        $this->log('AddChallenge ', ['domain' => $domain, 'token' => $token, 'validation' => $validation]);
         $this->collection->insertOne([
-            'domain' => $domain,
-            'token' => $token,
+            'domain' => strtolower($domain),
+            'token' => strtolower($token),
             'validation' => $validation,
             'timestamp' => new UTCDateTime(),
             'expires' => new UTCDateTime(strtotime('+1 hour') * 1000)
@@ -31,9 +38,10 @@ class CertbotChallengeDBHelper {
     }
 
     public function RemoveChallenge(string $domain, string $token) : void {
+        $this->log('RemoveChallenge ', ['domain' => $domain, 'token' => $token]);
         $this->collection->deleteOne([
-            'domain' => $domain,
-            'token' => $token
+            'domain' => strtolower($domain),
+            'token' => strtolower($token)
         ]);
         // remove any expired
         $this->collection->deleteMany([
@@ -41,50 +49,42 @@ class CertbotChallengeDBHelper {
         ]);
     }
 
-    public function GetValidation(string $domain, string $token) : ?string {
-        $challenge = $this->collection->findOne(['token' => $token]);
+    public function GetChallenge(string $domain, string $token) : ?string {
+        $this->log('GetChallenge ', ['domain' => $domain, 'token' => $token]);
+
+        $challenge = $this->collection->findOne(['token' => strtolower($token), 'domain' => strtolower($domain)]);
 
         if ($challenge === null) {
+            $this->log('Token not found');
             return null;
         }
 
         // check if expired
         if ($challenge['expires'] < new UTCDateTime()) {
+            $this->log('Token expired', ['expires' => $challenge['expires']]);
             $this->RemoveChallenge($challenge['domain'], $challenge['token']);
             return null;
         }
+
+        $this->log('Token found');
 
         return $challenge['validation'];
     }
 
     public function HandleTokenRequest(ServerRequestInterface $request, ResponseInterface $response, array $args) : ResponseInterface {
-        $logger = $this->container->has('logger') ? $this->container->get('logger') : null;
-        if ($logger !== null) {
-            $logger->debug('HandleTokenRequest ', ['args' => $args, 'method' => $request->getMethod(), 'uri' => $request->getUri()]);
-        }
-        return $response->withStatus(405);
+        $this->log('HandleTokenRequest ', ['args' => $args, 'method' => $request->getMethod(), 'uri' => $request->getUri()]);
         if ($request->getMethod() !== 'GET') {
+            $this->log('Method not GET - Token request end with 405');
             return $response->withStatus(405);
         }
         $token = $args['token'];
         $domain = $request->getUri()->getHost();
-        $validation = $this->GetValidation($domain, $token);
+        $validation = $this->GetChallenge($domain, $token);
         if ($validation === null) {
-            if ($logger !== null) {
-                $logger->debug('Token not found');
-            }
+            $this->log('No validation found - Token request end with 404');
             return $response->withStatus(404);
         }
-        if ($logger !== null) {
-            $logger->debug('Token found!');
-        }
-        if ($validation->getExpires() < new UTCDateTime()) {
-            if ($logger !== null) {
-                $logger->debug('Token expired');
-            }
-            $this->RemoveChallenge($domain, $token);
-            return $response->withStatus(404);
-        }
+        $this->log('Validation OK - Token request end with 200');
         $response->getBody()->write($validation);
         return $response;
     }
