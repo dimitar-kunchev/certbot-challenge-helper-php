@@ -1,0 +1,28 @@
+{
+  "name": "dimitar-kunchev/certbot-challenge-helper-php",
+  "description": "PHP-based helper for certbot challenges - store them in MongoDB so a central server can validate them",
+  "minimum-stability": "stable",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "Dimitar Kunchev",
+      "email": "d.kunchev@gmail.com"
+    }
+  ],
+  "require": {
+    "php": "^7.4|^8",
+    "php-di/php-di": "*",
+    "psr/http-message": "*",
+    "mongodb/mongodb": "*",
+    "ext-mongo": "*"
+  },
+  "autoload" : {
+    "psr-4" : {
+      "CertbotChallengeDBHelper\\" : "./"
+    }
+  },
+  "scripts": {
+    "prepare": "CertbotChallengeDBHelper\\ComposerCommand::prepare",
+    "cleanup": "CertbotChallengeDBHelper\\ComposerCommand::cleanup"
+  }
+}
