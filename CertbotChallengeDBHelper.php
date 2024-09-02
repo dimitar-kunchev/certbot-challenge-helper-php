@@ -79,7 +79,11 @@ class CertbotChallengeDBHelper {
         }
         $token = $args['token'];
         $domain = $request->getUri()->getHost();
-        $validation = $this->GetChallenge($domain, $token);
+	    $validation = $this->GetChallenge($domain, $token);
+        if ($validation === null && str_starts_with($domain, "www.")) {
+            $this->log("Not found, retry without www. prefix");
+            $validation=$this->GetChallenge(substr($domain, 4), $token);
+        }
         if ($validation === null) {
             $this->log('No validation found - Token request end with 404');
             return $response->withStatus(404);
@@ -103,7 +107,7 @@ class CertbotChallengeDBHelper {
         $validation = getenv('CERTBOT_VALIDATION');
         $token = getenv('CERTBOT_TOKEN');
 
-        if ($domain === null || $validation === null || $token === null) {
+        if (!$domain || !$validation || !$token) {
             throw new \Exception('Missing environment variables');
         }
 
@@ -126,7 +130,7 @@ class CertbotChallengeDBHelper {
         $validation = getenv('CERTBOT_VALIDATION');
         $token = getenv('CERTBOT_TOKEN');
 
-        if ($domain === null || $validation === null || $token === null) {
+        if (!$domain || !$validation || !$token) {
             throw new \Exception('Missing environment variables');
         }
         $this->RemoveChallenge($domain, $token);
