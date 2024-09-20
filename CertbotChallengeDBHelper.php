@@ -26,10 +26,11 @@ class CertbotChallengeDBHelper {
         }
     }
 
-    public function AddChallenge(string $domain, string $token, $validation) : void {
+    public function AddChallenge(string $domain, string $token, string $validation, array $allDomains) : void {
         $this->log('AddChallenge ', ['domain' => $domain, 'token' => $token, 'validation' => $validation]);
         $this->collection->insertOne([
             'domain' => strtolower($domain),
+            'allDomains' => array_map('strtolower', $allDomains),
             'token' => strtolower($token),
             'validation' => $validation,
             'timestamp' => new UTCDateTime(),
@@ -52,7 +53,7 @@ class CertbotChallengeDBHelper {
     public function GetChallenge(string $domain, string $token) : ?string {
         $this->log('GetChallenge ', ['domain' => $domain, 'token' => $token]);
 
-        $challenge = $this->collection->findOne(['token' => strtolower($token), 'domain' => strtolower($domain)]);
+        $challenge = $this->collection->findOne(['token' => strtolower($token)]);
 
         if ($challenge === null) {
             $this->log('Token not found');
@@ -63,6 +64,11 @@ class CertbotChallengeDBHelper {
         if ($challenge['expires'] < new UTCDateTime()) {
             $this->log('Token expired', ['expires' => $challenge['expires']]);
             $this->RemoveChallenge($challenge['domain'], $challenge['token']);
+            return null;
+        }
+
+        if ($challenge['domain'] !== strtolower($domain) && !in_array(strtolower($domain), (array)$challenge['allDomains'])) {
+            $this->log('Domain not found in challenge');
             return null;
         }
 
@@ -106,12 +112,13 @@ class CertbotChallengeDBHelper {
         $domain = getenv('CERTBOT_DOMAIN');
         $validation = getenv('CERTBOT_VALIDATION');
         $token = getenv('CERTBOT_TOKEN');
+        $allDomains = explode(',', getenv('CERTBOT_ALL_DOMAINS') ?? '');
 
         if (!$domain || !$validation || !$token) {
             throw new \Exception('Missing environment variables');
         }
 
-        $this->AddChallenge($domain, $token, $validation);
+        $this->AddChallenge($domain, $token, $validation, $allDomains);
 
         return 0;
     }
