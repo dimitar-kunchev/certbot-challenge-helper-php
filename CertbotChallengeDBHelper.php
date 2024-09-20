@@ -67,8 +67,15 @@ class CertbotChallengeDBHelper {
             return null;
         }
 
-        if ($challenge['domain'] !== strtolower($domain) && !in_array(strtolower($domain), (array)$challenge['allDomains'])) {
-            $this->log('Domain not found in challenge');
+        $domain = strtolower($domain);
+        $allDomainsInToken = array_map('strtolower', (array)$challenge['allDomains']);
+        $domainInToken = strtolower($challenge['domain']);
+        if (!in_array($domain, $allDomainsInToken) && $domain !== $domainInToken) {
+            $this->log('Domain not found in challenge', [
+                'domain' => $domain,
+                'domainInToken' => $domainInToken,
+                'allDomains' => $allDomainsInToken
+            ]);
             return null;
         }
 
